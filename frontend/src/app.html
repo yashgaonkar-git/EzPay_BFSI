@@ -1,0 +1,376 @@
+@if (loading) {
+  <div class="loading" role="status"><span class="brand-icon"><ez-icon name="logo" /></span> Loading EzPay</div>
+} @else if (!user) {
+  <div class="auth-shell">
+    <aside class="auth-brand">
+      <div class="brand"><span class="brand-icon"><ez-icon name="logo" /></span> EzPay<span class="brand-dot">.</span></div>
+      <div class="auth-intro">
+        <span class="tag"><ez-icon name="wallet" /> Payments workspace</span>
+        <h1>Everyday payments,<br> in one place.</h1>
+        <p>Send money, keep track of bills, and check your transaction status from one dashboard.</p>
+      </div>
+      <div class="auth-footer"><ez-icon name="lock" /> Local sandbox · Simulated funds only</div>
+    </aside>
+    <main class="auth-main">
+      <section class="auth-card">
+        @switch (auth) {
+          @case ('login') { <h2>Welcome back</h2><p>Sign in to your EzPay account.</p> }
+          @case ('register') { <h2>Create your account</h2><p>Register to manage your payments with EzPay.</p> }
+          @case ('recover') { <h2>Recover your password</h2><p>Enter the email or mobile number you registered with.</p> }
+          @case ('reset') { <h2>Set a new password</h2><p>Use at least 12 characters for your new password.</p> }
+          @case ('verify') { <h2>Verify your identity</h2><p>Enter the six-digit code to {{ verifyPurpose === 'register' ? 'create your account' : 'finish signing in' }}.</p> }
+        }
+        @if (error) { <div class="message error" role="alert">{{ error }}</div> }
+        @if (success) { <div class="message success" role="status">{{ success }}</div> }
+        @if (auth === 'verify' && challenge) { <div class="message info">Sandbox verification code <strong>{{ challenge.code }}</strong></div> }
+        @if (auth === 'recover' && resetUrl) {
+          <div class="message info">For a matching account, open the <a [href]="resetUrl" (click)="resetHere($event)">sandbox reset link</a>.</div>
+        }
+        <form (ngSubmit)="submitAuth()" #authFields="ngForm" class="fields">
+          @if (auth === 'register') {
+            <label>Full name<input name="fullName" autocomplete="name" [(ngModel)]="authForm.name" required maxlength="80"></label>
+            <label>Email address<input type="email" name="email" autocomplete="email" [(ngModel)]="authForm.email" required maxlength="150"></label>
+            <label>Mobile number<input type="tel" name="mobile" autocomplete="tel" [(ngModel)]="authForm.mobile" placeholder="10-digit Indian number or international number" required maxlength="24"></label>
+          }
+          @if (auth === 'login' || auth === 'recover') {
+            <label>Email or mobile number<input name="identity" autocomplete="username" [(ngModel)]="authForm.identity" required maxlength="150"></label>
+          }
+          @if (auth === 'login' || auth === 'register' || auth === 'reset') {
+            <label>{{ auth === 'reset' ? 'New password' : 'Password' }}
+              <input type="password" name="password" [attr.autocomplete]="auth === 'login' ? 'current-password' : 'new-password'"
+                [(ngModel)]="authForm.password" required [minlength]="auth === 'login' ? 1 : 12" maxlength="72">
+            </label>
+          }
+          @if (auth === 'reset') {
+            <label>Confirm password<input type="password" name="confirmation" autocomplete="new-password" [(ngModel)]="authForm.confirmation" required maxlength="72"></label>
+          }
+          @if (auth === 'verify') {
+            <label>Verification code<input name="verificationCode" inputmode="numeric" autocomplete="one-time-code" [(ngModel)]="authForm.code" pattern="[0-9]{6}" maxlength="6" required></label>
+          }
+          @if (auth === 'login') { <button type="button" class="text-button right" (click)="showAuth('recover')">Forgot password?</button> }
+          <button type="submit" class="button primary" [disabled]="busy || authFields.invalid">
+            {{ {login: 'Sign in', register: 'Request verification', recover: 'Request reset link', verify: 'Verify code', reset: 'Update password'}[auth] }}
+          </button>
+        </form>
+        @if (auth === 'login') {
+          <div class="auth-links"><span>New to EzPay?</span> <button type="button" class="text-button" (click)="showAuth('register')">Create an account</button></div>
+          <div class="auth-divider"><span>or explore the sandbox</span></div>
+          <button type="button" class="button secondary demo-button" [disabled]="busy" (click)="openDemo()">Open demo account</button>
+        } @else {
+          <div class="auth-links">
+            @if (auth === 'verify') {
+              <button type="button" class="text-button" (click)="showAuth(verifyPurpose)">Start again to request a new code</button>
+            } @else {
+              <button type="button" class="text-button" (click)="showAuth('login')">Back to sign in</button>
+            }
+          </div>
+        }
+      </section>
+    </main>
+  </div>
+} @else {
+  <div class="workspace">
+    @if (mobileOpen) { <button type="button" class="mobile-scrim" aria-label="Close navigation" (click)="mobileOpen = false"></button> }
+    <aside class="sidebar" [class.mobile-open]="mobileOpen">
+      <button type="button" class="brand" (click)="navigate('Overview')" aria-label="EzPay overview"><span class="brand-icon"><ez-icon name="logo" /></span> EzPay<span class="brand-dot">.</span></button>
+      <nav aria-label="Workspace navigation">
+        <div class="nav-group"><p>Workspace</p>
+          @for (item of mainPages; track item) {
+            <button type="button" [class.active]="page === item" [attr.aria-current]="page === item ? 'page' : null" (click)="navigate(item)">
+              <ez-icon [name]="item" /> {{ item }}
+            </button>
+          }
+        </div>
+        <div class="nav-group"><p>Account</p>
+          @for (item of accountPages; track item) {
+            <button type="button" [class.active]="page === item" [attr.aria-current]="page === item ? 'page' : null" (click)="navigate(item)">
+              <ez-icon [name]="item" /> {{ item }}
+              @if (item === 'Notifications' && unread) { <span class="nav-count">{{ unread }}</span> }
+            </button>
+          }
+        </div>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="environment"><span></span> Sandbox mode</div>
+        <button type="button" class="sign-out" [disabled]="busy" (click)="signOut()"><ez-icon name="logOut" /> Sign out</button>
+      </div>
+    </aside>
+
+    <div class="application">
+      <header class="topbar">
+        <div class="breadcrumb">
+          <button type="button" class="icon-button menu-button" aria-label="Open navigation" [attr.aria-expanded]="mobileOpen" (click)="mobileOpen = !mobileOpen"><ez-icon name="menu" /></button>
+          <span>Workspace</span><ez-icon name="chevron" /><strong>{{ page }}</strong>
+        </div>
+        <div class="top-actions">
+          <button type="button" class="search-button" aria-label="Find a feature" (click)="openSearch()"><ez-icon name="search" /><span>Find a feature</span></button>
+          <button type="button" class="icon-button notification-button" [attr.aria-label]="'Notifications, ' + unread + ' unread'" (click)="navigate('Notifications')"><ez-icon name="Notifications" />@if (unread) { <span></span> }</button>
+          <button type="button" class="avatar" aria-label="Profile settings" (click)="navigate('Settings')">
+            @if (user.photo) { <img [src]="user.photo" alt=""> } @else { {{ initials }} }
+          </button>
+        </div>
+      </header>
+
+      <main class="page" [class.report]="page === 'Transactions'">
+        <div class="page-header">
+          <div>
+            <h1>{{ page === 'Overview' ? 'Welcome, ' + firstName : page }}</h1>
+            <p>{{ pageDescriptions[page] }}</p>
+          </div>
+          @if (page === 'Overview') {
+            <button type="button" class="button primary" (click)="startPayment('UPI')"><ez-icon name="plus" /> New payment</button>
+          }
+          @if (page === 'Transactions') {
+            <button type="button" class="button secondary" (click)="printReport()"><ez-icon name="printer" /> Print / save as PDF</button>
+          }
+          @if (page === 'Bills') {
+            <button type="button" class="button primary" (click)="billEditor = !billEditor"><ez-icon [name]="billEditor ? 'close' : 'plus'" /> {{ billEditor ? 'Close form' : 'Add a bill' }}</button>
+          }
+        </div>
+        @if (error) { <div class="message error global-message" role="alert">{{ error }}</div> }
+        @if (success) { <div class="message success global-message" role="status">{{ success }}</div> }
+
+        @switch (page) {
+          @case ('Overview') {
+            <div class="summary-grid">
+              <section class="balance-card">
+                <div class="balance-top"><span class="balance-icon"><ez-icon name="wallet" /></span><span class="balance-label">Demo balance</span>
+                  <button type="button" class="icon-button light" [attr.aria-label]="hiddenBalance ? 'Show balance' : 'Hide balance'" (click)="hiddenBalance = !hiddenBalance"><ez-icon name="eye" /></button>
+                </div>
+                <p class="balance">{{ hiddenBalance ? '₹ ••••••' : value(user.balance) }}</p>
+                <span class="balance-foot">Available for demo payments</span>
+              </section>
+              <section class="panel quick-panel">
+                <h2>Quick actions</h2>
+                <div class="quick-actions">
+                  <button type="button" (click)="startPayment('UPI')"><span class="tile mint"><ez-icon name="logo" /></span><strong>Pay with UPI</strong><small>Send to a UPI ID</small></button>
+                  <button type="button" (click)="startPayment('BANK')"><span class="tile blue"><ez-icon name="bank" /></span><strong>Bank transfer</strong><small>Send to an account</small></button>
+                  <button type="button" (click)="navigate('Bills')"><span class="tile purple"><ez-icon name="Bills" /></span><strong>Manage bills</strong><small>View due payments</small></button>
+                </div>
+              </section>
+            </div>
+            <div class="overview-details">
+              <section class="panel">
+                <div class="panel-header"><div><h2>Recent transactions</h2><p>Your latest payment activity</p></div><button type="button" class="text-button" (click)="navigate('Transactions')">View all</button></div>
+                @if (activity.length) {
+                  <ng-container *ngTemplateOutlet="paymentRows; context: { $implicit: activity.slice(0, 5) }" />
+                } @else {
+                  <div class="empty"><span class="tile blue"><ez-icon name="Transactions" /></span><strong>No transactions yet</strong><p>Your payments will appear here.</p><button type="button" class="text-button" (click)="startPayment('UPI')">Send your first payment</button></div>
+                }
+              </section>
+              <section class="panel">
+                <div class="panel-header"><div><h2>Bills to pay</h2><p>Upcoming and overdue payments</p></div></div>
+                @for (bill of upcoming.slice(0, 3); track bill.id) {
+                  <div class="mini-bill"><span class="tile purple"><ez-icon name="Bills" /></span><div><strong>{{ bill.name }}</strong><small>{{ billDate(bill.dueDate) }}</small></div><span>{{ value(bill.amount) }}</span></div>
+                } @empty {
+                  <div class="empty compact"><span class="tile purple"><ez-icon name="Bills" /></span><strong>No bills due</strong><p>Add a bill to keep track of its due date.</p></div>
+                }
+                <div class="panel-footer"><button type="button" class="text-button" (click)="navigate('Bills')">Manage bills</button></div>
+              </section>
+            </div>
+          }
+          @case ('Send money') {
+            <div class="form-layout">
+              <section class="panel padded">
+                @if (settledPayment; as payment) {
+                  <div class="receipt-summary">
+                    <span class="tile" [class.mint]="payment.state === 'COMPLETED'" [class.rose]="payment.state === 'FAILED'"><ez-icon [name]="payment.state === 'COMPLETED' ? 'check' : 'Transactions'" /></span>
+                    <h2>Payment {{ stateName(payment.state).toLowerCase() }}</h2>
+                    <p class="receipt-amount">{{ value(payment.amount) }}</p>
+                    @if (payment.failure) { <div class="message error" role="alert">{{ payment.failure }}</div> }
+                    <p>{{ payment.recipient }}</p>
+                    <div class="button-row"><button type="button" class="button secondary" (click)="openReceipt(payment)">View details</button><button type="button" class="button primary" (click)="clearPayment()">New payment</button></div>
+                  </div>
+                } @else if (paymentStage === 'edit') {
+                  <h2>Payment details</h2>
+                  @if (!paymentForm.billId) {
+                    <div class="method-tabs" aria-label="Payment method">
+                      <button type="button" [class.current]="paymentForm.method === 'UPI'" [attr.aria-pressed]="paymentForm.method === 'UPI'" (click)="paymentForm.method = 'UPI'"><ez-icon name="logo" /> UPI payment</button>
+                      <button type="button" [class.current]="paymentForm.method === 'BANK'" [attr.aria-pressed]="paymentForm.method === 'BANK'" (click)="paymentForm.method = 'BANK'"><ez-icon name="bank" /> Bank transfer</button>
+                    </div>
+                  }
+                  <form #paymentFields="ngForm" (ngSubmit)="reviewPayment()" class="fields">
+                    @if (paymentForm.method === 'UPI') {
+                      <label>Recipient UPI ID<input name="recipient" placeholder="recipient@demo" maxlength="100" [(ngModel)]="paymentForm.recipient" [readOnly]="!!paymentForm.billId" required></label>
+                    } @else {
+                      <label>Recipient account number<input name="account" inputmode="numeric" maxlength="18" [(ngModel)]="paymentForm.account" required></label>
+                      <label>IFSC<input name="ifsc" placeholder="DEMO0000001" maxlength="11" [(ngModel)]="paymentForm.ifsc" required></label>
+                    }
+                    <label>Amount (₹)<input name="amount" inputmode="decimal" placeholder="0.00" [(ngModel)]="paymentForm.amount" [readOnly]="!!paymentForm.billId" required></label>
+                    <label>{{ paymentForm.method === 'BANK' ? 'Purpose of transfer' : 'Payment note (optional)' }}
+                      <input name="note" maxlength="160" [(ngModel)]="paymentForm.note" [required]="paymentForm.method === 'BANK'">
+                    </label>
+                    <button class="button primary" [disabled]="busy || paymentFields.invalid">Review payment</button>
+                  </form>
+                } @else if (paymentRequest; as payment) {
+                  <h2>{{ paymentStage === 'review' ? 'Review your payment' : 'Verify this payment' }}</h2>
+                  <dl class="details">
+                    <div><dt>Amount</dt><dd>{{ value(payment.amount) }}</dd></div>
+                    <div><dt>Payment method</dt><dd>{{ methodName(payment.method) }}</dd></div>
+                    <div><dt>Recipient</dt><dd>{{ payment.method === 'UPI' ? payment.recipient : payment.account + ' · ' + payment.ifsc }}</dd></div>
+                    @if (payment.note) { <div><dt>Note</dt><dd>{{ payment.note }}</dd></div> }
+                  </dl>
+                  @if (paymentStage === 'verify') {
+                    <div class="message info">Sandbox verification code <strong>{{ paymentVerification?.code }}</strong></div>
+                    <form #otpFields="ngForm" (ngSubmit)="confirmPayment()" class="fields">
+                      <label>Verification code<input name="paymentOtp" inputmode="numeric" autocomplete="one-time-code" [(ngModel)]="paymentOtp" pattern="[0-9]{6}" maxlength="6" required></label>
+                      <div class="button-row"><button type="button" class="button secondary" (click)="editPayment()">Edit details</button><button type="submit" class="button primary" [disabled]="busy || otpFields.invalid">Verify and send</button></div>
+                    </form>
+                  } @else {
+                    <div class="button-row"><button type="button" class="button secondary" (click)="editPayment()">Edit details</button><button type="button" class="button primary" [disabled]="busy" (click)="confirmPayment()">Confirm payment</button></div>
+                  }
+                }
+              </section>
+              <aside class="panel padded context">
+                <span class="tile mint"><ez-icon name="lock" /></span><h2>Sandbox payments</h2>
+                <p>Use test recipient details. Transfers draw from your demo balance.</p>
+                <p>Available balance <strong>{{ value(user.balance) }}</strong></p>
+                <button type="button" class="text-button" (click)="navigate('Settings')">Manage payment methods</button>
+              </aside>
+            </div>
+          }
+          @case ('Transactions') {
+            <section class="panel">
+              <form class="filters" (ngSubmit)="refreshReport()">
+                <label class="filter-search">Search<input name="q" type="search" placeholder="Recipient, note or reference" [(ngModel)]="filters.q" maxlength="160"></label>
+                <label>Type<select name="method" [(ngModel)]="filters.method"><option value="">All types</option><option value="UPI">UPI</option><option value="BANK">Bank transfer</option></select></label>
+                <label>Status<select name="state" [(ngModel)]="filters.state"><option value="">All statuses</option><option value="INITIATED">Initiated</option><option value="PROCESSING">Processing</option><option value="COMPLETED">Completed</option><option value="FAILED">Failed</option></select></label>
+                <label>From<input name="from" type="date" [(ngModel)]="filters.from"></label>
+                <label>To<input name="to" type="date" [(ngModel)]="filters.to"></label>
+                <div class="button-row"><button class="button primary" [disabled]="busy">Apply</button><button type="button" class="text-button" [disabled]="busy" (click)="clearFilters()">Clear</button></div>
+              </form>
+              <div class="panel-header"><div><h2>Payment history</h2><p>{{ filtered.length }} {{ filtered.length === 1 ? 'transaction' : 'transactions' }}</p></div></div>
+              @if (filtered.length) {
+                <ng-container *ngTemplateOutlet="paymentRows; context: { $implicit: filtered }" />
+              } @else {
+                <div class="empty"><span class="tile blue"><ez-icon name="Transactions" /></span><strong>{{ activeFilterQuery ? 'No matching transactions' : 'No transactions yet' }}</strong><p>{{ activeFilterQuery ? 'Try changing your search or filters.' : 'Your payment history will appear here.' }}</p></div>
+              }
+            </section>
+          }
+          @case ('Bills') {
+            @if (billEditor) {
+              <section class="panel padded inline-form">
+                <h2>New bill</h2>
+                <form #billFields="ngForm" class="fields" (ngSubmit)="addBill()">
+                  <label>Bill name<input name="billName" placeholder="e.g. Internet" [(ngModel)]="billForm.name" maxlength="100" required></label>
+                  <label>Amount (₹)<input name="billAmount" inputmode="decimal" placeholder="0.00" [(ngModel)]="billForm.amount" required></label>
+                  <label>Due date<input name="billDate" type="date" [(ngModel)]="billForm.dueDate" required></label>
+                  <label>Recipient UPI ID<input name="billUpi" placeholder="provider@demo" [(ngModel)]="billForm.upi" maxlength="100" required></label>
+                  <label class="checkbox"><input name="monthly" type="checkbox" [(ngModel)]="billForm.monthly"> Repeat every month</label>
+                  <button class="button primary" [disabled]="busy || billFields.invalid">Save bill</button>
+                </form>
+              </section>
+            }
+            <section class="panel">
+              <div class="panel-header bill-controls"><div><h2>Your bills</h2><p>Reminders arrive within three days of the due date.</p></div>
+                <label>Show<select [(ngModel)]="billFilter"><option>Open</option><option>All</option><option>Upcoming</option><option>Overdue</option><option>Processing</option><option>Paid</option></select></label>
+              </div>
+              @for (bill of visibleBills; track bill.id) {
+                <div class="bill-row">
+                  <span class="tile purple"><ez-icon name="Bills" /></span>
+                  <div class="row-name"><strong>{{ bill.name }}</strong><small>{{ bill.monthly ? 'Monthly' : 'One-time' }} · Due {{ billDate(bill.dueDate) }}</small></div>
+                  <span class="pill" [class]="bill.state.toLowerCase()">{{ stateName(bill.state) }}</span>
+                  <strong class="row-amount">{{ value(bill.amount) }}</strong>
+                  @if (bill.state !== 'PAID' && bill.state !== 'PROCESSING') { <button type="button" class="button secondary" (click)="startPayment('UPI', bill)">Pay bill</button> }
+                </div>
+              } @empty {
+                <div class="empty"><span class="tile purple"><ez-icon name="Bills" /></span><strong>No {{ billFilter === 'All' ? '' : billFilter.toLowerCase() + ' ' }}bills</strong><p>Add a bill to track when it’s due.</p></div>
+              }
+            </section>
+          }
+          @case ('Notifications') {
+            <section class="panel">
+              <div class="panel-header"><div><h2>Inbox</h2><p>{{ unread }} unread</p></div>
+                @if (browserPermission === 'default') {
+                  <button type="button" class="button secondary" (click)="enableBrowserNotifications()">Enable desktop alerts</button>
+                }
+              </div>
+              @for (notice of notices; track notice.id) {
+                <div class="notice-row" [class.unread]="!notice.seen">
+                  <span class="tile mint"><ez-icon name="Notifications" /></span>
+                  <div class="row-name"><strong>{{ notice.title }}</strong><p>{{ notice.message }}</p><small>{{ date(notice.createdAt) }}</small></div>
+                  @if (!notice.seen) { <button type="button" class="text-button" [disabled]="busy" (click)="markRead(notice)">Mark as read</button> }
+                </div>
+              } @empty {
+                <div class="empty"><span class="tile mint"><ez-icon name="Notifications" /></span><strong>You’re all caught up</strong><p>Payment updates and bill reminders will appear here.</p></div>
+              }
+            </section>
+          }
+          @case ('Settings') {
+            <div class="settings-grid">
+              @if (profile; as form) {
+                <section class="panel padded">
+                  <h2>Personal details</h2>
+                  <form #profileFields="ngForm" class="fields" (ngSubmit)="saveProfile()">
+                    <label>Full name<input name="name" autocomplete="name" [(ngModel)]="form.name" maxlength="80" required></label>
+                    <div class="read-only"><span>{{ user.email }}</span><span>{{ user.mobile }}</span></div>
+                    <label>Address<textarea name="address" autocomplete="street-address" [(ngModel)]="form.address" maxlength="240"></textarea></label>
+                    <label>Profile picture<input type="file" accept="image/png,image/jpeg,image/webp" (change)="selectPhoto($event)"></label>
+                    @if (form.photo) { <button type="button" class="text-button" (click)="form.photo = ''">Remove profile picture</button> }
+                    <fieldset>
+                      <legend>Notifications</legend>
+                      <label class="checkbox"><input name="confirmations" type="checkbox" [(ngModel)]="form.confirmations"> Transaction confirmations</label>
+                      <label class="checkbox"><input name="reminders" type="checkbox" [(ngModel)]="form.reminders"> Bill reminders</label>
+                    </fieldset>
+                    <button class="button primary" [disabled]="busy || profileFields.invalid">Save changes</button>
+                  </form>
+                </section>
+              }
+              <section class="panel padded">
+                <h2>Payment methods</h2>
+                <p class="muted">Link a test UPI ID or bank account to use it in the sandbox.</p>
+                <form class="fields" (ngSubmit)="linkMethods()">
+                  <label>Demo UPI ID<input name="myUpi" placeholder="mywallet@demo" [(ngModel)]="methods.upi" maxlength="100"></label>
+                  <label>Demo bank account<input name="myBank" [placeholder]="user.bank || 'Test account number'" [(ngModel)]="methods.account" maxlength="18" inputmode="numeric"></label>
+                  <label>IFSC<input name="myIfsc" placeholder="DEMO0000001" [(ngModel)]="methods.ifsc" maxlength="11"></label>
+                  <button class="button primary" [disabled]="busy">Save payment methods</button>
+                </form>
+              </section>
+            </div>
+          }
+        }
+        <footer class="page-footer"><span>EzPay</span><span>Local sandbox · Simulated funds only</span></footer>
+      </main>
+    </div>
+  </div>
+
+  <dialog #receiptDialog (close)="closeReceipt()">
+    @if (selected; as payment) {
+      <div class="dialog-header"><h2>Transaction details</h2><form method="dialog"><button class="icon-button" aria-label="Close transaction details"><ez-icon name="close" /></button></form></div>
+      <p class="receipt-amount">{{ value(payment.amount) }}</p>
+      <span class="pill" [class]="payment.state.toLowerCase()" aria-live="polite">{{ stateName(payment.state) }}</span>
+      @if (payment.failure) { <div class="message error" role="alert">{{ payment.failure }}</div> }
+      <dl class="details">
+        <div><dt>Payment type</dt><dd>{{ methodName(payment.method) }}</dd></div>
+        <div><dt>Recipient</dt><dd>{{ payment.recipient }}</dd></div>
+        @if (payment.note) { <div><dt>Note</dt><dd>{{ payment.note }}</dd></div> }
+        <div><dt>Created</dt><dd>{{ date(payment.createdAt) }}</dd></div>
+        <div><dt>Last updated</dt><dd>{{ date(payment.updatedAt) }}</dd></div>
+        <div><dt>Reference</dt><dd>{{ payment.id }}</dd></div>
+      </dl>
+    }
+  </dialog>
+  <dialog #searchDialog>
+    <div class="dialog-header"><h2>Find a feature</h2><form method="dialog"><button class="icon-button" aria-label="Close search"><ez-icon name="close" /></button></form></div>
+    <label>Search EzPay<input type="search" autofocus [(ngModel)]="search" placeholder="e.g. transaction history"></label>
+    <div class="feature-results">
+      @for (item of matchingPages; track item) {
+        <button type="button" (click)="navigate(item)"><ez-icon [name]="item" /><span><strong>{{ item }}</strong><small>{{ pageDescriptions[item] }}</small></span></button>
+      } @empty { <p class="muted">No matching features.</p> }
+    </div>
+  </dialog>
+}
+
+<ng-template #paymentRows let-rows>
+  <div class="transactions">
+    <div class="transaction-head"><span>Payment</span><span>Date</span><span>Status</span><span>Amount</span></div>
+    @for (item of rows; track item.id) {
+      <button type="button" class="transaction-row" (click)="openReceipt(item)">
+        <span class="transaction-name"><span class="tile" [class.mint]="item.method === 'UPI'" [class.blue]="item.method === 'BANK'"><ez-icon [name]="item.method === 'UPI' ? 'logo' : 'bank'" /></span><span><strong>{{ item.recipient }}</strong><small>{{ methodName(item.method) }}</small></span></span>
+        <span class="transaction-date">{{ date(item.createdAt) }}</span>
+        <span><span class="pill" [class]="item.state.toLowerCase()">{{ stateName(item.state) }}</span></span>
+        <strong class="row-amount">{{ value(item.amount) }}</strong>
+      </button>
+    }
+  </div>
+</ng-template>
