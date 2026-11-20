@@ -7,7 +7,7 @@ EzPay brings payment initiation, transaction tracking, and bill reminders into o
 > [!IMPORTANT]
 > EzPay runs locally with simulated funds. The application displays demo verification codes and password reset links so you can test the account flows without external services.
 
-[Quick start](#quick-start) · [Demo walkthrough](#demo-walkthrough) · [Architecture](#architecture) · [Development](#development) · [Requirements specification](EzPay_BFSI.md)
+[Installation](#installation) · [Demo walkthrough](#demo-walkthrough) · [Architecture](#architecture) · [Development](#development) · [Requirements specification](EzPay_BFSI.md)
 
 ## Features
 
@@ -19,16 +19,30 @@ EzPay brings payment initiation, transaction tracking, and bill reminders into o
 | Bill management | One-time and monthly bills, upcoming and overdue views, reminders, and simulated bill payment. |
 | Notifications | An inbox for confirmations, reminders, and fraud alerts, with optional desktop alerts while EzPay is open. |
 
-## Quick start
+## Installation
 
 Install **Java 17 or newer**, **Maven 3.6.3 or newer**, and **Node.js 22.12+ on the 22.x line or Node.js 24.x**, with npm.
 
-From the repository root, build the Angular frontend and package it with the Spring Boot backend.
+Clone the private repository with a GitHub account that has access.
+
+```bash
+git clone https://github.com/yashgaonkar-git/EzPay_BFSI.git
+cd EzPay_BFSI
+```
+
+Install the frontend dependencies from the lockfile, build the web app, and package it with the backend.
 
 ```bash
 npm --prefix frontend ci
 npm --prefix frontend run build
 mvn -f backend/pom.xml clean package
+```
+
+`npm ci` creates `frontend/node_modules/` and Maven creates the runnable `backend/target/ezpay-1.0.0.jar`. Both are excluded from Git. Rerun the installation and build commands to recreate them after cleanup.
+
+Start the packaged app from the repository root.
+
+```bash
 cd backend
 java -jar target/ezpay-1.0.0.jar
 ```
