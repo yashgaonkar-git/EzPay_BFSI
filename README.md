@@ -23,7 +23,7 @@ EzPay brings payment initiation, transaction tracking, and bill reminders into o
 
 Install **Java 17 or newer**, **Maven 3.6.3 or newer**, and **Node.js 22.12+ on the 22.x line or Node.js 24.x**, with npm.
 
-Clone the private repository with a GitHub account that has access.
+Clone the repository and enter the project directory.
 
 ```bash
 git clone https://github.com/yashgaonkar-git/EzPay_BFSI.git
